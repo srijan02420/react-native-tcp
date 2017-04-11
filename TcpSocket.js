@@ -361,7 +361,7 @@ TcpSocket.prototype._write = function(buffer: any, encoding: ?String, callback: 
   } else if (this._state === STATE.CONNECTING) {
     // we're ok, GCDAsyncSocket handles queueing internally
   }
-
+  buffer = global.Buffer.from(buffer, 'utf8')
   callback = callback || noop;
   var str;
   if (typeof buffer === 'string') {
