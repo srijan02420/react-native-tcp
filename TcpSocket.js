@@ -344,18 +344,51 @@ TcpSocket.prototype._onError = function(error: string): void {
   this.destroy();
 };
 
-TcpSocket.prototype.write = function(chunk, encoding, cb) {
-  if (typeof chunk !== 'string' && !(Buffer.isBuffer(chunk))) {
+TcpSocket.prototype.write = function(buffer: any, callback: ?(err: ?Error) => void) : boolean {
+  var self = this;
+  // this.emit('toast', 'writing');
+  // if (typeof chunk !== 'string' && !(Buffer.isBuffer(chunk))) {
+  //   throw new TypeError(
+  //     'Invalid data, chunk must be a string or buffer, not ' + typeof chunk);
+  // }
+  if (this._state === STATE.DISCONNECTED) {
+    throw new Error('Socket is not connected.');
+  } else if (this._state === STATE.CONNECTING) {
+    // we're ok, GCDAsyncSocket handles queueing internally
+  }
+  buffer = global.Buffer.from(buffer, 'utf8')
+  callback = callback || noop;
+  var str;
+  if (typeof buffer === 'string') {
+    self._debug('socket.WRITE(): encoding as base64');
+    str = Base64Str.encode(buffer);
+  } else if (Buffer.isBuffer(buffer)) {
+    str = buffer.toString('base64');
+  } else {
     throw new TypeError(
-      'Invalid data, chunk must be a string or buffer, not ' + typeof chunk);
+      'Invalid data, chunk must be a string or buffer, not ' + typeof buffer);
   }
 
-  return stream.Duplex.prototype.write.apply(this, arguments);
+  Sockets.write(this._id, str, function(err) {
+    if (self._timeout) {
+      self._activeTimer(this._timeout.msecs);
+    }
+
+    err = normalizeError(err);
+    if (err) {
+      self._debug('write failed', err);
+      return callback(err);
+    }
+
+    callback();
+  });
+
+  return true;
+  // return stream.Duplex.prototype.write.apply(this, arguments);
 };
 
 TcpSocket.prototype._write = function(buffer: any, encoding: ?String, callback: ?(err: ?Error) => void) : boolean {
   var self = this;
-
   if (this._state === STATE.DISCONNECTED) {
     throw new Error('Socket is not connected.');
   } else if (this._state === STATE.CONNECTING) {
